@@ -1,14 +1,19 @@
 import { Keypair, Networks } from "@stellar/stellar-sdk";
+import type { Client as XelmaClient, BetSide } from "@tevalabs/xelma-bindings";
 import logger from "../utils/logger";
-import { Client, BetSide } from "@tevalabs/xelma-bindings";
 
 export class SorobanService {
-  private client: any = null;
+  private client: XelmaClient | null = null;
   private adminKeypair: Keypair | null = null;
   private oracleKeypair: Keypair | null = null;
   private initialized = false;
+  private readonly ready: Promise<void>;
 
   constructor() {
+    this.ready = this.init();
+  }
+
+  private async init(): Promise<void> {
     try {
       const contractId = process.env.SOROBAN_CONTRACT_ID;
       const network = process.env.SOROBAN_NETWORK || "testnet";
@@ -17,7 +22,6 @@ export class SorobanService {
       const adminSecret = process.env.SOROBAN_ADMIN_SECRET;
       const oracleSecret = process.env.SOROBAN_ORACLE_SECRET;
 
-      // Hard-disable if anything critical is missing
       if (!contractId || !adminSecret || !oracleSecret) {
         logger.warn(
           "Soroban configuration or bindings missing. Soroban integration DISABLED.",
@@ -25,7 +29,7 @@ export class SorobanService {
         return;
       }
 
-      // NOTE: Requires @tevalabs/xelma-bindings to be installed
+      const { Client } = await import("@tevalabs/xelma-bindings");
       this.client = new Client({
         contractId,
         networkPassphrase:
@@ -44,7 +48,8 @@ export class SorobanService {
     }
   }
 
-  private ensureInitialized() {
+  private async ensureInitialized(): Promise<void> {
+    await this.ready;
     if (!this.initialized || !this.client) {
       throw new Error("Soroban service is not initialized");
     }
@@ -57,7 +62,7 @@ export class SorobanService {
     startPrice: number,
     durationLedgers: number,
   ): Promise<string> {
-    this.ensureInitialized();
+    await this.ensureInitialized();
     try {
       logger.info(
         `Creating Soroban round: price=${startPrice}, duration=${durationLedgers}`,
@@ -87,7 +92,7 @@ export class SorobanService {
     amount: number,
     side: "UP" | "DOWN",
   ): Promise<void> {
-    this.ensureInitialized();
+    await this.ensureInitialized();
     try {
       logger.info(
         `Placing bet on Soroban: user=${userAddress}, amount=${amount}, side=${side}`,
@@ -119,7 +124,7 @@ export class SorobanService {
    * Resolves a round on the Soroban contract
    */
   async resolveRound(finalPrice: number): Promise<void> {
-    this.ensureInitialized();
+    await this.ensureInitialized();
     try {
       logger.info(`Resolving Soroban round: finalPrice=${finalPrice}`);
 
@@ -141,6 +146,7 @@ export class SorobanService {
    * Gets the active round from Soroban
    */
   async getActiveRound(): Promise<any> {
+    await this.ready;
     if (!this.initialized) return null;
     try {
       const round = await this.client!.get_active_round();
@@ -155,7 +161,7 @@ export class SorobanService {
    * Mints initial tokens for a new user
    */
   async mintInitial(userAddress: string): Promise<number> {
-    this.ensureInitialized();
+    await this.ensureInitialized();
     try {
       const result = await this.client!.mint_initial({ user: userAddress });
       // Convert from stroops to XLM
@@ -170,6 +176,7 @@ export class SorobanService {
    * Gets user balance from Soroban
    */
   async getBalance(userAddress: string): Promise<number> {
+    await this.ready;
     if (!this.initialized) return 0;
     try {
       const balance = await this.client!.balance({ user: userAddress });
