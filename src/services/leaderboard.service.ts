@@ -1,12 +1,10 @@
-import { prisma } from "../lib/prisma";
 import { GameMode } from "@prisma/client";
-import { Decimal } from "@prisma/client/runtime/library";
+import { prisma } from "../lib/prisma";
 import {
   LeaderboardEntry,
   LeaderboardResponse,
-  ModeStats,
 } from "../types/leaderboard.types";
-import { toNumber, toDecimal } from "../utils/decimal.util";
+import { toDecimal, toNumber } from "../utils/decimal.util";
 
 // Get leaderboard with pagination
 
@@ -80,6 +78,39 @@ export async function getLeaderboard(
     totalUsers,
     lastUpdated: new Date().toISOString(),
   };
+}
+
+// Get multiple users' positions and stats
+export async function getBatchUserPositions(userIds: string[]): Promise<
+  Array<{
+    userId: string;
+    position?: LeaderboardEntry;
+    error?: string;
+  }>
+> {
+  const results = await Promise.allSettled(
+    userIds.map(async (userId) => {
+      const position = await getUserPosition(userId);
+      return {
+        userId,
+        position,
+      };
+    }),
+  );
+
+  return results.map((result, index) => {
+    if (result.status === "fulfilled") {
+      return result.value;
+    } else {
+      return {
+        userId: userIds[index],
+        error:
+          result.reason instanceof Error
+            ? result.reason.message
+            : "Unknown error",
+      };
+    }
+  });
 }
 
 // Get specific user's position and stats
@@ -167,9 +198,7 @@ export async function updateUserStatsForRound(roundId: string): Promise<void> {
   for (const prediction of round.predictions) {
     const isCorrect = calculatePredictionResult(prediction, round);
     const earnings = toDecimal(
-      isCorrect
-        ? toNumber(prediction.amount)
-        : -toNumber(prediction.amount),
+      isCorrect ? toNumber(prediction.amount) : -toNumber(prediction.amount),
     );
 
     // Determine mode from round
