@@ -89,7 +89,7 @@ export class PredictionService {
           data: {
             virtualBalance: { decrement: amountNum },
           },
-        }).catch((err) => {
+        }).catch((err: any) => {
           if (err.code === "P2025") {
             throw new Error("Insufficient balance");
           }

@@ -239,15 +239,6 @@ router.post(
         return next(new AuthenticationError("Invalid or expired challenge", "INVALID_CHALLENGE"));
       }
 
-      // Re-fetch the challenge record to get its ID for later steps
-      const authChallenge = await prisma.authChallenge.findUnique({
-        where: { challenge },
-      });
-
-      if (!authChallenge) {
-        return next(new AuthenticationError("Invalid or expired challenge", "INVALID_CHALLENGE"));
-      }
-
       // Verify the signature using Stellar SDK
       const isValidSignature = await verifySignature(
         walletAddress,
@@ -355,14 +346,6 @@ router.post(
           },
         });
       }
-
-      // Link challenge to user
-      await prisma.authChallenge.update({
-        where: { id: authChallenge.id },
-        data: {
-          userId: user.id,
-        },
-      });
 
       // Generate JWT token
       const token = generateToken(user.id, user.walletAddress);
