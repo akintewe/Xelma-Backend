@@ -16,6 +16,7 @@ import roundSchedulerService from './services/round-scheduler.service';
 import logger from './utils/logger';
 import { errorHandler } from './middleware/errorHandler.middleware';
 import { metricsMiddleware } from './middleware/metrics.middleware';
+import { requestIdMiddleware } from './middleware/requestId.middleware';
 import metricsRoutes from './routes/metrics.routes';
 import chatRoutes from "./routes/chat.routes";
 import swaggerUi from 'swagger-ui-express';
@@ -53,12 +54,16 @@ export function createApp(): Express {
   app.use(express.json());
   app.use(express.urlencoded({ extended: true }));
 
+  // Request ID middleware (first, so all subsequent middleware has access)
+  app.use(requestIdMiddleware);
+
   // Prometheus metrics middleware (before routes so all requests are tracked)
   app.use(metricsMiddleware);
 
   // Request logging middleware
   app.use((req: Request, res: Response, next: NextFunction) => {
-    logger.info(`${req.method} ${req.path}`);
+    const requestId = (req as any).requestId;
+    logger.info(`${req.method} ${req.path}`, { requestId });
     next();
   });
 
