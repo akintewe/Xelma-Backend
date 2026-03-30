@@ -4,31 +4,15 @@ import websocketService from "./websocket.service";
 import logger from "../utils/logger";
 import { toDecimal, toNumber } from "../utils/decimal.util";
 import { invalidateNamespace } from "../lib/redis";
-import { Decimal } from "@prisma/client/runtime/library";
+import { UserPriceRange } from "../types/round.types";
+import {
+  parseRoundPriceRanges,
+  findRangeByBounds,
+  updateRangePool,
+  validateUserPriceRange,
+} from "../utils/price-range.util";
+import type { Prisma } from "@prisma/client";
 import { ValidationError } from "../utils/errors";
-
-interface PriceRange {
-  min: number;
-  max: number;
-}
-
-interface LegendsPriceRange extends PriceRange {
-  pool: number;
-}
-
-function isValidPriceRange(value: any): value is PriceRange {
-  return (
-    value &&
-    typeof value === "object" &&
-    Number.isFinite(value.min) &&
-    Number.isFinite(value.max) &&
-    value.min < value.max
-  );
-}
-
-function rangesEqual(a: PriceRange, b: PriceRange): boolean {
-  return new Decimal(a.min).eq(b.min) && new Decimal(a.max).eq(b.max);
-}
 
 export class PredictionService {
   /**
@@ -39,7 +23,7 @@ export class PredictionService {
     roundId: string,
     amount: number,
     side?: "UP" | "DOWN",
-    priceRange?: PriceRange,
+    priceRange?: UserPriceRange,
   ): Promise<any> {
     try {
       const prediction = await prisma.$transaction(async (tx) => {
@@ -81,25 +65,17 @@ export class PredictionService {
               "Price range is required for LEGENDS mode",
             );
           }
-
-          if (!isValidPriceRange(priceRange)) {
+          const priceRangeValidation = validateUserPriceRange(priceRange);
+          if (!priceRangeValidation.valid) {
             throw new ValidationError(
-              "Price range must include numeric min and max with min < max",
+              `Price range must include numeric min and max with min < max`,
             );
           }
-
-          const ranges = Array.isArray(round.priceRanges)
-            ? ((round.priceRanges as unknown) as LegendsPriceRange[])
-            : [];
-
-          if (ranges.length === 0) {
-            throw new ValidationError(
-              "LEGENDS round has no configured price ranges",
-            );
-          }
-
-          const validRange = ranges.find(
-            (r) => isValidPriceRange(r) && rangesEqual(r, priceRange),
+          const ranges = parseRoundPriceRanges(round.priceRanges);
+          const validRange = findRangeByBounds(
+            ranges,
+            priceRange.min,
+            priceRange.max,
           );
           if (!validRange) {
             throw new ValidationError("Invalid price range for this round");
@@ -141,7 +117,7 @@ export class PredictionService {
             userId,
             amount: amountNum,
             side,
-            priceRange: priceRange as any,
+            priceRange: priceRange ? { min: priceRange.min, max: priceRange.max } : undefined,
           },
         });
 
@@ -163,24 +139,18 @@ export class PredictionService {
             `Prediction submitted (UP_DOWN): user=${userId}, round=${roundId}, side=${side}`,
           );
         } else if (round.mode === "LEGENDS") {
-          const ranges = (round.priceRanges as unknown as LegendsPriceRange[]) || [];
-          // Update price range pool (Note: JSON updates are not as atomic as increments in Prisma,
-          // but being inside the same transaction with the round read above provides baseline safety)
-          const updatedRanges = ranges.map((r) => {
-            if (
-              isValidPriceRange(r) &&
-              isValidPriceRange(priceRange) &&
-              rangesEqual(r, priceRange)
-            ) {
-              return { ...r, pool: r.pool + amount };
-            }
-            return r;
-          });
+          const ranges = parseRoundPriceRanges(round.priceRanges);
+          const updatedRanges = updateRangePool(
+            ranges,
+            priceRange!.min,
+            priceRange!.max,
+            amount,
+          );
 
           await tx.round.update({
             where: { id: roundId },
             data: {
-              priceRanges: updatedRanges as any,
+              priceRanges: updatedRanges as unknown as Prisma.InputJsonValue,
             },
           });
 

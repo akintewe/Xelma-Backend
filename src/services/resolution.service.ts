@@ -16,15 +16,10 @@ import {
 } from "../utils/decimal.util";
 import { Decimal } from "@prisma/client/runtime/library";
 import { ValidationError } from "../utils/errors";
-import { RoundLifecycleOutcome } from "../types/round.types";
+import { RoundLifecycleOutcome, RoundPriceRange, UserPriceRange } from "../types/round.types";
+import { parseRoundPriceRanges, validateUserPriceRange } from "../utils/price-range.util";
 
-interface PriceRange {
-  min: number;
-  max: number;
-  pool: number;
-}
-
-function isValidRange(range: any): range is PriceRange {
+function isValidRange(range: any): range is RoundPriceRange {
   return (
     range &&
     Number.isFinite(range.min) &&
@@ -271,9 +266,7 @@ export class ResolutionService {
     finalPrice: number,
   ): Promise<void> {
     const finalPriceDec = new Decimal(finalPrice);
-    const priceRanges = Array.isArray(round.priceRanges)
-      ? (round.priceRanges as PriceRange[])
-      : [];
+    const priceRanges = parseRoundPriceRanges(round.priceRanges);
 
     if (priceRanges.length === 0) {
       throw new ValidationError("LEGENDS round has no configured price ranges");
@@ -358,7 +351,12 @@ export class ResolutionService {
     }
 
     for (const prediction of round.predictions) {
-      const predictionRange = prediction.priceRange as any;
+      const priceRangeValidation = validateUserPriceRange(prediction.priceRange);
+      if (!priceRangeValidation.valid) {
+        logger.warn(`Invalid price range in prediction ${prediction.id}: ${priceRangeValidation.error}`);
+        continue;
+      }
+      const predictionRange: UserPriceRange = priceRangeValidation.data;
 
       if (
         new Decimal(predictionRange.min).eq(winningRange.min) &&

@@ -1,10 +1,18 @@
 import { z } from 'zod';
 
-const legendsPriceRangeSchema = z.object({
-  min: z.number().finite('Range min must be a finite number'),
-  max: z.number().finite('Range max must be a finite number'),
-}).refine((range) => range.min < range.max, {
-  message: 'Each range must satisfy min < max',
+export const priceRangeSchema = z.object({
+  min: z.number(),
+  max: z.number(),
+  pool: z.number().optional().default(0),
+}).refine((data) => data.min < data.max, {
+  message: "min must be less than max",
+});
+
+export const userPriceRangeSchema = z.object({
+  min: z.number(),
+  max: z.number(),
+}).refine((data) => data.min < data.max, {
+  message: "min must be less than max",
 });
 
 export const startRoundSchema = z.object({
@@ -19,7 +27,7 @@ export const startRoundSchema = z.object({
   duration: z
     .number()
     .positive('Invalid duration'),
-  priceRanges: z.array(legendsPriceRangeSchema).min(2, 'LEGENDS mode requires at least 2 ranges').optional(),
+  priceRanges: z.array(priceRangeSchema).min(2, 'LEGENDS mode requires at least 2 ranges').optional(),
 }).superRefine((data, ctx) => {
   if (data.mode !== 1 && data.priceRanges) {
     ctx.addIssue({
@@ -47,4 +55,15 @@ export const resolveRoundSchema = z.object({
   finalPrice: z
     .number()
     .positive('Invalid final price'),
+});
+
+export const createPriceRangeSchema = z.object({
+  min: z.number(),
+  max: z.number(),
+});
+
+export const submitLegendsPredictionSchema = z.object({
+  roundId: z.string().uuid(),
+  amount: z.number().positive(),
+  priceRange: userPriceRangeSchema,
 });

@@ -6,6 +6,43 @@ export enum GameMode {
   LEGENDS = 1,
 }
 
+export interface PriceRange {
+  min: number;
+  max: number;
+  [key: string]: unknown;
+}
+
+export interface RoundPriceRange extends PriceRange {
+  pool: number;
+}
+
+export interface UserPriceRange extends PriceRange {}
+
+export function isRoundPriceRange(value: unknown): value is RoundPriceRange {
+  if (typeof value !== "object" || value === null) return false;
+  const obj = value as Record<string, unknown>;
+  return (
+    typeof obj.min === "number" &&
+    typeof obj.max === "number" &&
+    typeof obj.pool === "number" &&
+    obj.min < obj.max
+  );
+}
+
+export function isUserPriceRange(value: unknown): value is UserPriceRange {
+  if (typeof value !== "object" || value === null) return false;
+  const obj = value as Record<string, unknown>;
+  return (
+    typeof obj.min === "number" &&
+    typeof obj.max === "number" &&
+    obj.min < obj.max
+  );
+}
+
+export function isRoundPriceRangeArray(value: unknown): value is RoundPriceRange[] {
+  return Array.isArray(value) && value.every(isRoundPriceRange);
+}
+
 export enum RoundStatus {
   ACTIVE = "ACTIVE",
   RESOLVED = "RESOLVED",
