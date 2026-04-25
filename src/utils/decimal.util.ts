@@ -54,7 +54,25 @@ export function decEq(a: Decimal | number, b: Decimal | number): boolean {
   return toDecimal(a).eq(toDecimal(b));
 }
 
-/** Format a Decimal to a fixed-precision string (default 2 decimals) */
-export function decFixed(value: Decimal | number, places: number = 2): string {
+/** Check if a >= b */
+export function decGte(a: Decimal | number, b: Decimal | number): boolean {
+  return toDecimal(a).gte(toDecimal(b));
+}
+
+/** Check if a <= b */
+export function decLte(a: Decimal | number, b: Decimal | number): boolean {
+  return toDecimal(a).lte(toDecimal(b));
+}
+
+/** Format a Decimal to a fixed-precision string (default 8 decimals) */
+export function decFixed(value: Decimal | number, places: number = 8): string {
+  return toDecimal(value).toFixed(places);
+}
+
+/** Serialize Decimal to a fixed-precision string for API boundaries */
+export function toDecimalString(
+  value: Decimal | number | string,
+  places: number = 8,
+): string {
   return toDecimal(value).toFixed(places);
 }

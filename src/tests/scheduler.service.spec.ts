@@ -35,6 +35,7 @@ import {
   afterAll,
   jest,
 } from "@jest/globals";
+import { Decimal } from "@prisma/client/runtime/library";
 
 // Simple in-memory storage for mock rounds
 let mockRounds: any[] = [];
@@ -255,7 +256,7 @@ describeDb("SchedulerService", () => {
       mockRounds = [];
 
       // Healthy oracle defaults — individual tests override as needed.
-      (priceOracle.getPrice as any).mockReturnValue(0.35);
+      (priceOracle.getPrice as any).mockReturnValue(new Decimal(0.35));
       (priceOracle.isStale as any).mockReturnValue(false);
       (resolutionService.resolveRound as any).mockResolvedValue(undefined);
     });
@@ -282,7 +283,7 @@ describeDb("SchedulerService", () => {
       expect(resolutionService.resolveRound).toHaveBeenCalledTimes(1);
       expect(resolutionService.resolveRound).toHaveBeenCalledWith(
         round.id,
-        0.35,
+        '0.35',
       );
     });
 
@@ -296,7 +297,7 @@ describeDb("SchedulerService", () => {
 
       expect(resolutionService.resolveRound).toHaveBeenCalledWith(
         round.id,
-        0.35,
+        '0.35',
       );
     });
 
@@ -333,7 +334,7 @@ describeDb("SchedulerService", () => {
     });
 
     it("skips all resolution when the oracle price is zero", async () => {
-      (priceOracle.getPrice as any).mockReturnValue(0);
+      (priceOracle.getPrice as any).mockReturnValue(new Decimal(0));
       await createRound();
 
       await schedulerService.autoResolveRounds();
@@ -342,7 +343,7 @@ describeDb("SchedulerService", () => {
     });
 
     it("skips all resolution when the oracle price is negative", async () => {
-      (priceOracle.getPrice as any).mockReturnValue(-0.1);
+      (priceOracle.getPrice as any).mockReturnValue(new Decimal(-0.1));
       await createRound();
 
       await schedulerService.autoResolveRounds();

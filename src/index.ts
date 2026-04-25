@@ -111,9 +111,9 @@ export function createApp(): Express {
     });
   });
 
-  // Price Oracle endpoint
+  // Price Oracle endpoint (returns price_usd as a precise decimal string)
   app.get("/api/price", (req: Request, res: Response) => {
-    const price = priceOracle.getPrice();
+    const price = priceOracle.getPriceString();
     const lastUpdatedAt = priceOracle.getLastUpdatedAt();
     res.json({
       asset: "XLM",
@@ -164,7 +164,7 @@ export function startServer(app: Express): ServerHandle {
 
   // Emit price updates via WebSocket
   const priceInterval = setInterval(() => {
-    const price = priceOracle.getPrice();
+    const price = priceOracle.getPriceString();
     if (price !== null) {
       websocketService.emitPriceUpdate("XLM", price);
     }

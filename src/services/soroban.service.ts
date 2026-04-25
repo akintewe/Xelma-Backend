@@ -1,6 +1,8 @@
 import { Keypair, Networks, Transaction } from "@stellar/stellar-sdk";
 import type { Client as XelmaClient, BetSide, OraclePayload, RoundMode } from "@tevalabs/xelma-bindings";
 import logger from "../utils/logger";
+import { toDecimal } from "../utils/decimal.util";
+import { Decimal } from "@prisma/client/runtime/library";
 
 export interface SorobanHealth {
   initialized: boolean;
@@ -104,7 +106,7 @@ export class SorobanService {
    * mode: 0 = Up/Down (default), 1 = Precision (Legends)
    */
   async createRound(
-    startPrice: number,
+    startPrice: number | string | Decimal,
     mode: RoundMode = 0 as RoundMode,
   ): Promise<void> {
     await this.ensureInitialized();
@@ -114,7 +116,7 @@ export class SorobanService {
       );
 
       // Price scaled to 4 decimal places (e.g. 0.2297 → 2297)
-      const priceScaled = BigInt(Math.round(startPrice * 10_000));
+      const priceScaled = BigInt(toDecimal(startPrice).mul(10_000).toFixed(0));
 
       const tx = await this.client!.create_round({
         start_price: priceScaled,
@@ -134,7 +136,7 @@ export class SorobanService {
    */
   async placeBet(
     userAddress: string,
-    amount: number,
+    amount: number | string,
     side: "UP" | "DOWN",
   ): Promise<void> {
     await this.ensureInitialized();
@@ -144,7 +146,7 @@ export class SorobanService {
       );
 
       // Amount in stroops (1 XLM = 10^7 stroops)
-      const amountInStroops = BigInt(Math.floor(amount * 10_000_000));
+      const amountInStroops = BigInt(toDecimal(amount).mul(10_000_000).toFixed(0));
 
       const betSide: BetSide =
         side === "UP"
@@ -169,7 +171,7 @@ export class SorobanService {
    * Resolves the active round via oracle payload (oracle only).
    */
   async resolveRound(
-    finalPrice: number,
+    finalPrice: number | string | Decimal,
     roundId: number,
     timestamp: bigint,
   ): Promise<void> {
@@ -178,7 +180,7 @@ export class SorobanService {
       logger.info(`Resolving Soroban round: finalPrice=${finalPrice}, roundId=${roundId}`);
 
       // Price scaled to 4 decimal places
-      const priceScaled = BigInt(Math.round(finalPrice * 10_000));
+      const priceScaled = BigInt(toDecimal(finalPrice).mul(10_000).toFixed(0));
 
       const payload: OraclePayload = {
         price: priceScaled,

@@ -6,6 +6,8 @@ import logger from "../utils/logger";
 import { prisma } from "../lib/prisma";
 import { ConflictError, ValidationError } from "../utils/errors";
 import { RoundLifecycleOutcome } from "../types/round.types";
+import { Decimal } from "@prisma/client/runtime/library";
+import { toDecimal, toNumber } from "../utils/decimal.util";
 
 interface LegendsPriceRange {
   min: number;
@@ -18,7 +20,7 @@ export class RoundService {
    */
   async startRound(
     mode: "UP_DOWN" | "LEGENDS",
-    startPrice: number,
+    startPrice: number | string | Decimal,
     durationMinutes: number,
     customPriceRanges?: LegendsPriceRange[],
   ): Promise<any> {
@@ -47,10 +49,13 @@ export class RoundService {
 
       let sorobanRoundId: string | null = null;
 
+      const startPriceDecimal = toDecimal(startPrice);
+      const startPriceNumber = toNumber(startPriceDecimal);
+
       // Mode 0 (UP_DOWN): Create round on Soroban contract
       if (mode === "UP_DOWN") {
         try {
-          await sorobanService.createRound(startPrice, 0);
+          await sorobanService.createRound(startPriceDecimal, 0);
         } catch (e) {
           logger.warn("Soroban createRound failed, proceeding with DB-only round:", e);
         }
@@ -62,7 +67,7 @@ export class RoundService {
         const rangesToUse =
           customPriceRanges && customPriceRanges.length > 0
             ? customPriceRanges
-            : this.generateDefaultLegendsRanges(startPrice);
+            : this.generateDefaultLegendsRanges(startPriceNumber);
 
         this.validateLegendsRanges(rangesToUse);
 
@@ -80,7 +85,7 @@ export class RoundService {
           status: "ACTIVE",
           startTime,
           endTime,
-          startPrice,
+          startPrice: startPriceDecimal,
           sorobanRoundId,
           isSoroban: mode === "UP_DOWN" && sorobanService.isReady(),
           priceRanges: priceRanges
@@ -107,8 +112,8 @@ export class RoundService {
             userId: user.id,
             type: "ROUND_START",
             title: "New Round Started!",
-            message: `A new ${mode === "UP_DOWN" ? "Up/Down" : "Legends"} round has started! Place your prediction now. Starting price: $${startPrice.toFixed(4)}`,
-            data: { roundId: round.id, startPrice },
+            message: `A new ${mode === "UP_DOWN" ? "Up/Down" : "Legends"} round has started! Place your prediction now. Starting price: $${startPriceDecimal.toFixed(4)}`,
+            data: { roundId: round.id, startPrice: startPriceNumber },
           });
 
           if (notif) {

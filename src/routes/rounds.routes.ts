@@ -2,6 +2,7 @@ import { Router, Request, Response, NextFunction } from 'express';
 import roundService from '../services/round.service';
 import resolutionService from '../services/resolution.service';
 import { requireAdmin, requireOracle, AuthenticatedRequest } from '../middleware/auth.middleware';
+import { toDecimal } from '../utils/decimal.util';
 import { adminRoundRateLimiter, oracleResolveRateLimiter } from '../middleware/rateLimiter.middleware';
 import { validate } from '../middleware/validate.middleware';
 import { startRoundSchema, resolveRoundSchema } from '../schemas/rounds.schema';
@@ -111,7 +112,12 @@ router.post('/start', requireAdmin, adminRoundRateLimiter, validate(startRoundSc
     try {
         const { mode, startPrice, duration, priceRanges } = req.body;
         const gameMode = mode === 0 ? 'UP_DOWN' : 'LEGENDS';
-        const round = await roundService.startRound(gameMode, startPrice, duration, priceRanges);
+        const round = await roundService.startRound(
+          gameMode,
+          startPrice,
+          duration,
+          priceRanges,
+        );
 
         res.json({
             success: true,
@@ -303,7 +309,7 @@ router.post('/:id/resolve', requireOracle, oracleResolveRateLimiter, validate(re
         const { id } = req.params;
         const { finalPrice } = req.body;
 
-        const { outcome, round } = await resolutionService.resolveRound(id, finalPrice);
+        const { outcome, round } = await resolutionService.resolveRound(id, toDecimal(finalPrice));
 
         if (!round) {
             return res.status(404).json({ success: false, error: "Round not found" });

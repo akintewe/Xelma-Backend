@@ -86,7 +86,7 @@ class WebSocketService {
   /**
    * Emit price update event
    */
-  emitPriceUpdate(asset: string, price: number): void {
+  emitPriceUpdate(asset: string, price: number | string): void {
     if (!this.io) {
       logger.warn("WebSocket not initialized, cannot emit price:update");
       return;

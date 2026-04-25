@@ -43,6 +43,7 @@ import {
   afterEach,
   jest,
 } from "@jest/globals";
+import { Decimal } from "@prisma/client/runtime/library";
 import { prisma } from "../lib/prisma";
 import roundSchedulerService from "../services/round-scheduler.service";
 import roundService from "../services/round.service";
@@ -144,7 +145,7 @@ describe("RoundSchedulerService", () => {
       delete process.env.ROUND_SCHEDULER_MODE;
 
       // Healthy oracle defaults — individual tests override as needed.
-      (priceOracle.getPrice as any).mockReturnValue(0.35);
+      (priceOracle.getPrice as any).mockReturnValue(new Decimal(0.35));
       (priceOracle.isStale as any).mockReturnValue(false);
 
       // DB: no active round by default.
@@ -174,7 +175,7 @@ describe("RoundSchedulerService", () => {
     });
 
     it("skips creation when oracle price is zero", async () => {
-      (priceOracle.getPrice as any).mockReturnValue(0);
+      (priceOracle.getPrice as any).mockReturnValue(new Decimal(0));
 
       await roundSchedulerService.createRound();
 
@@ -182,7 +183,7 @@ describe("RoundSchedulerService", () => {
     });
 
     it("skips creation when oracle price is negative", async () => {
-      (priceOracle.getPrice as any).mockReturnValue(-0.5);
+      (priceOracle.getPrice as any).mockReturnValue(new Decimal(-0.5));
 
       await roundSchedulerService.createRound();
 

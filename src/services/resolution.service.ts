@@ -13,6 +13,8 @@ import {
   decMul,
   decEq,
   decFixed,
+  decGte,
+  decLte,
 } from "../utils/decimal.util";
 import { Decimal } from "@prisma/client/runtime/library";
 import { ValidationError } from "../utils/errors";
@@ -32,7 +34,7 @@ export class ResolutionService {
   /**
    * Resolves a round with the final price
    */
-  async resolveRound(roundId: string, finalPrice: number): Promise<any> {
+  async resolveRound(roundId: string, finalPrice: number | string | Decimal): Promise<any> {
     try {
       // Get round
       const round = await prisma.round.findUnique({
@@ -64,11 +66,13 @@ export class ResolutionService {
         return { outcome: RoundLifecycleOutcome.NO_OP };
       }
 
+      const finalPriceDec = toDecimal(finalPrice);
+
       // Mode-specific resolution
       if (round.mode === "UP_DOWN") {
-        await this.resolveUpDownRound(round, finalPrice);
+        await this.resolveUpDownRound(round, finalPriceDec);
       } else if (round.mode === "LEGENDS") {
-        await this.resolveLegendsRound(round, finalPrice);
+        await this.resolveLegendsRound(round, finalPriceDec);
       }
 
       // Update round status and persist resolvedAt
@@ -77,7 +81,7 @@ export class ResolutionService {
         where: { id: roundId },
         data: {
           status: "RESOLVED",
-          endPrice: finalPrice,
+          endPrice: finalPriceDec,
           resolvedAt,
         },
       });
@@ -85,7 +89,7 @@ export class ResolutionService {
       // Invalidate leaderboard after user stats affecting rankings change.
       void invalidateNamespace("leaderboard");
 
-      logger.info(`Round resolved: ${roundId}, finalPrice=${finalPrice}`);
+      logger.info(`Round resolved: ${roundId}, finalPrice=${finalPriceDec.toFixed(8)}`);
       // -----------------------------
       // Generate Educational Tip
       // -----------------------------
@@ -125,7 +129,7 @@ export class ResolutionService {
    */
   private async resolveUpDownRound(
     round: any,
-    finalPrice: number,
+    finalPrice: Decimal,
   ): Promise<void> {
     // Call Soroban contract to resolve
     await sorobanService.resolveRound(
@@ -134,9 +138,10 @@ export class ResolutionService {
       BigInt(Math.floor(Date.now() / 1000)),
     );
 
-    const priceWentUp = finalPrice > toNumber(round.startPrice);
-    const priceWentDown = finalPrice < toNumber(round.startPrice);
-    const priceUnchanged = finalPrice === toNumber(round.startPrice);
+    const startPriceDec = toDecimal(round.startPrice);
+    const priceWentUp = finalPrice.gt(startPriceDec);
+    const priceWentDown = finalPrice.lt(startPriceDec);
+    const priceUnchanged = finalPrice.eq(startPriceDec);
 
     const winningSide = priceWentUp ? "UP" : priceWentDown ? "DOWN" : null;
 
@@ -263,9 +268,8 @@ export class ResolutionService {
    */
   private async resolveLegendsRound(
     round: any,
-    finalPrice: number,
+    finalPrice: Decimal,
   ): Promise<void> {
-    const finalPriceDec = new Decimal(finalPrice);
     const priceRanges = parseRoundPriceRanges(round.priceRanges);
 
     if (priceRanges.length === 0) {
@@ -283,11 +287,11 @@ export class ResolutionService {
     // except for the final range whose upper bound is inclusive.
     const winningRange = sortedRanges.find((range, index) => {
       const isLast = index === sortedRanges.length - 1;
-      const min = new Decimal(range.min);
-      const max = new Decimal(range.max);
+      const min = toDecimal(range.min);
+      const max = toDecimal(range.max);
       return isLast
-        ? finalPriceDec.gte(min) && finalPriceDec.lte(max)
-        : finalPriceDec.gte(min) && finalPriceDec.lt(max);
+        ? finalPrice.gte(min) && finalPrice.lte(max)
+        : finalPrice.gte(min) && finalPrice.lt(max);
     });
 
     if (!winningRange) {
@@ -359,8 +363,8 @@ export class ResolutionService {
       const predictionRange: UserPriceRange = priceRangeValidation.data;
 
       if (
-        new Decimal(predictionRange.min).eq(winningRange.min) &&
-        new Decimal(predictionRange.max).eq(winningRange.max)
+        toDecimal(predictionRange.min).eq(toDecimal(winningRange.min)) &&
+        toDecimal(predictionRange.max).eq(toDecimal(winningRange.max))
       ) {
         // Winner (decimal-safe)
         const predAmount = toDecimal(prediction.amount);

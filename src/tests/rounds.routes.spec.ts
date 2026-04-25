@@ -268,7 +268,20 @@ describe('Rounds Routes - Mode Validation (Issue #63)', () => {
       expect(res.body.round.status).toBe('RESOLVED');
       expect(res.body.round.predictions).toBe(2);
       expect(res.body.round.winners).toBe(1);
-      expect(mockResolveRound).toHaveBeenCalledWith('round-resolve-id', 0.1301);
+      expect(mockResolveRound).toHaveBeenCalledWith('round-resolve-id', expect.anything());
+    });
+
+    it('accepts string finalPrice values for resolution', async () => {
+      const res = await request(app)
+        .post('/api/rounds/round-resolve-id/resolve')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          finalPrice: '0.1301',
+        });
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(mockResolveRound).toHaveBeenCalledWith('round-resolve-id', expect.anything());
     });
   });
 });

@@ -3,6 +3,7 @@ import roundService from "./round.service";
 import priceOracle from "./oracle";
 import logger from "../utils/logger";
 import { prisma } from "../lib/prisma";
+import { toNumber } from "../utils/decimal.util";
 
 class RoundSchedulerService {
   private cronTasks: ScheduledTask[] = [];
@@ -43,7 +44,7 @@ class RoundSchedulerService {
     try {
       const startPrice = priceOracle.getPrice();
 
-      if (!startPrice || startPrice <= 0) {
+      if (!startPrice || startPrice.lte(0)) {
         logger.warn("[Round Scheduler] Skipping round creation: invalid price from oracle");
         return;
       }
@@ -71,7 +72,7 @@ class RoundSchedulerService {
         return;
       }
 
-      const round = await roundService.startRound(mode, startPrice, 1);
+      const round = await roundService.startRound(mode, toNumber(startPrice), 1);
 
       logger.info(
         `[Round Scheduler] Created round ${round.id}, mode=${mode}, startPrice=${startPrice.toFixed(4)}`,

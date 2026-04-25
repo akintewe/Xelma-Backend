@@ -1,9 +1,11 @@
 import axios from 'axios';
 import logger from '../utils/logger';
+import { toDecimal, toNumber, toDecimalString } from '../utils/decimal.util';
+import { Decimal } from '@prisma/client/runtime/library';
 
 class PriceOracle {
   private static instance: PriceOracle;
-  private price: number | null = null;
+  private price: Decimal | null = null;
   private readonly COINGECKO_URL = 'https://api.coingecko.com/api/v3/simple/price?ids=stellar&vs_currencies=usd';
   private readonly POLLING_INTERVAL = 10000; // 10 seconds
   private readonly REQUEST_TIMEOUT = 5000; // 5s axios timeout
@@ -61,10 +63,11 @@ class PriceOracle {
       const response = await axios.get(this.COINGECKO_URL, {
         timeout: this.REQUEST_TIMEOUT,
       });
-      if (response.data?.stellar?.usd) {
-        this.price = response.data.stellar.usd;
+      const rawPrice = response.data?.stellar?.usd;
+      if (rawPrice !== undefined && rawPrice !== null) {
+        this.price = toDecimal(rawPrice as string | number);
         this.lastUpdatedAt = new Date();
-        logger.info(`Fetched XLM price: $${this.price}`);
+        logger.info(`Fetched XLM price: $${toDecimalString(this.price)}`);
       } else {
         logger.warn('Invalid response structure from CoinGecko:', response.data);
       }
@@ -81,8 +84,16 @@ class PriceOracle {
     }
   }
 
-  public getPrice(): number | null {
+  public getPrice(): Decimal | null {
     return this.price;
+  }
+
+  public getPriceNumber(): number | null {
+    return this.price ? toNumber(this.price) : null;
+  }
+
+  public getPriceString(places = 8): string | null {
+    return this.price ? toDecimalString(this.price, places) : null;
   }
 
   public isStale(): boolean {

@@ -88,7 +88,7 @@ class SchedulerService {
       // Get current price
       const currentPrice = priceOracle.getPrice();
 
-      if (!currentPrice || currentPrice <= 0) {
+      if (!currentPrice || currentPrice.lte(0)) {
         logger.warn("Cannot auto-resolve rounds: Invalid price from oracle");
         return;
       }
@@ -101,10 +101,19 @@ class SchedulerService {
       // Resolve each round
       for (const round of expiredRounds) {
         try {
-          const result = await resolutionService.resolveRound(round.id, currentPrice);
+          const result = await resolutionService.resolveRound(
+            round.id,
+            currentPrice.toString(),
+          );
+
+          if (!result) {
+            logger.warn(`Auto-resolution skipped for round ${round.id}: empty result`);
+            continue;
+          }
+
           if (result.outcome === RoundLifecycleOutcome.UPDATED) {
             logger.info(
-              `Auto-resolved round ${round.id} with price ${currentPrice}`,
+              `Auto-resolved round ${round.id} with price ${currentPrice.toString()}`,
             );
           } else if (result.outcome === RoundLifecycleOutcome.ALREADY_RESOLVED) {
             logger.info(`Round ${round.id} was already resolved`);

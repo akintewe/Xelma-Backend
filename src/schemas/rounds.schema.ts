@@ -15,15 +15,21 @@ export const userPriceRangeSchema = z.object({
   message: "min must be less than max",
 });
 
+const priceStringOrNumber = z.union([
+  z.number(),
+  z.string().regex(/^[0-9]+(\.[0-9]+)?$/, 'Invalid price format'),
+]);
+
 export const startRoundSchema = z.object({
   mode: z
     .number()
     .int('Invalid mode. Must be 0 (UP_DOWN) or 1 (LEGENDS)')
     .min(0, 'Invalid mode. Must be 0 (UP_DOWN) or 1 (LEGENDS)')
     .max(1, 'Invalid mode. Must be 0 (UP_DOWN) or 1 (LEGENDS)'),
-  startPrice: z
-    .number()
-    .positive('Invalid start price'),
+  startPrice: priceStringOrNumber.refine((value) => {
+    const numeric = typeof value === 'string' ? parseFloat(value) : value;
+    return Number.isFinite(numeric) && numeric > 0;
+  }, 'Invalid start price'),
   duration: z
     .number()
     .positive('Invalid duration'),
@@ -52,9 +58,10 @@ export const startRoundSchema = z.object({
 });
 
 export const resolveRoundSchema = z.object({
-  finalPrice: z
-    .number()
-    .positive('Invalid final price'),
+  finalPrice: priceStringOrNumber.refine((value) => {
+    const numeric = typeof value === 'string' ? parseFloat(value) : value;
+    return Number.isFinite(numeric) && numeric > 0;
+  }, 'Invalid final price'),
 });
 
 export const createPriceRangeSchema = z.object({

@@ -187,6 +187,37 @@ describe('Monetary Precision and Deterministic Payouts', () => {
         expect(uA!.virtualBalance.toFixed(8)).toBe('1015.83333333');
     });
 
+    it('should resolve with a string finalPrice without losing precision', async () => {
+        const round = await prisma.round.create({
+            data: {
+                mode: 'UP_DOWN',
+                status: 'ACTIVE',
+                startPrice: 100.0,
+                startTime: new Date(),
+                endTime: new Date(),
+                poolUp: 20.66,
+                poolDown: 10.34,
+            },
+        });
+
+        await prisma.prediction.createMany({
+            data: [
+                { roundId: round.id, userId: userA.id, side: 'UP', amount: 10.33 },
+                { roundId: round.id, userId: userB.id, side: 'UP', amount: 10.33 },
+                { roundId: round.id, userId: userC.id, side: 'DOWN', amount: 10.34 },
+            ],
+        });
+
+        await resolutionService.resolveRound(round.id, '105.0');
+
+        const predictions = await prisma.prediction.findMany({ where: { roundId: round.id } });
+        const pA = predictions.find(p => p.userId === userA.id);
+        const pB = predictions.find(p => p.userId === userB.id);
+
+        expect(pA!.payout!.toFixed(8)).toBe('15.50000000');
+        expect(pB!.payout!.toFixed(8)).toBe('15.50000000');
+    });
+
     it('should handle repeating decimals (Repeating)', async () => {
         const round = await prisma.round.create({
             data: {

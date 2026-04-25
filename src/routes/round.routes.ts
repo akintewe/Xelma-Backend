@@ -50,8 +50,8 @@ function buildDefaultLegendsRanges(startPrice: number): LegendsPriceRange[] {
   ];
 }
 
-function priceToStroops(price: string): bigint {
-  const priceNum = parseFloat(price);
+function priceToStroops(price: string | number): bigint {
+  const priceNum = typeof price === "string" ? parseFloat(price) : price;
   if (isNaN(priceNum) || priceNum <= 0) {
     throw new Error("Invalid price: must be a positive number");
   }
@@ -80,7 +80,7 @@ router.post(
         });
       }
 
-      const priceNum = parseFloat(startPrice);
+      const priceNum = typeof startPrice === "string" ? parseFloat(startPrice) : startPrice;
       const durationMinutes = Math.ceil((durationLedgers * 5) / 60);
       const startTime = new Date();
       const endTime = new Date(
@@ -378,7 +378,7 @@ router.post(
         });
       }
 
-      const finalPriceNum = parseFloat(finalPrice);
+      const finalPriceNum = typeof finalPrice === "string" ? parseFloat(finalPrice) : finalPrice;
 
       const { outcome: lifecycleOutcome, round } = await resolutionService.resolveRound(
         roundId,

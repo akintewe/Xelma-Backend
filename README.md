@@ -296,7 +296,7 @@ Xelma-Backend/
 #### **System Endpoints**
 - `GET /` - Health check with timestamp
 - `GET /health` - Detailed health check (uptime, status)
-- `GET /api/price` - Current XLM/USD price with staleness info
+- `GET /api/price` - Current XLM/USD price as a decimal string with staleness info
 - `GET /api-docs` - Swagger UI documentation
 - `GET /api-docs.json` - OpenAPI specification
 

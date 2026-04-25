@@ -62,7 +62,7 @@ export enum BetSide {
 }
 
 export interface StartRoundRequestBody {
-  startPrice: string;
+  startPrice: string | number;
   durationLedgers: number;
   mode: GameMode;
   priceRanges?: { min: number; max: number }[];
@@ -94,7 +94,7 @@ export interface SubmitPredictionResponse {
 
 export interface ResolveRoundRequestBody {
   roundId: string;
-  finalPrice: string;
+  finalPrice: string | number;
   mode: GameMode;
 }
 
