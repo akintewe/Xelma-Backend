@@ -35,19 +35,58 @@ import {
   afterAll,
   jest,
 } from "@jest/globals";
+
+// Simple in-memory storage for mock rounds
+let mockRounds: any[] = [];
+
 jest.mock("../lib/prisma", () => ({
   __esModule: true,
   prisma: {
     round: {
-      findMany: jest.fn(() => Promise.resolve([])),
-      create: jest.fn((args: any) => Promise.resolve({ id: `mock-round-id-${Math.random()}`, ...(args?.data || {}) })),
-      deleteMany: jest.fn(),
-    },
+      findMany: jest.fn(async (args: any) => {
+        let filtered = [...mockRounds];
+        if (args?.where) {
+          if (args.where.status?.in) {
+            filtered = filtered.filter(r => args.where.status.in.includes(r.status));
+          } else if (args.where.status) {
+            filtered = filtered.filter(r => r.status === args.where.status);
+          }
+          
+          if (args.where.endTime?.lte) {
+            filtered = filtered.filter(r => r.endTime <= args.where.endTime.lte);
+          }
+        }
+        return filtered;
+      }),
+      create: jest.fn(async (args: any) => {
+        const newRound = { 
+          id: `mock-round-id-${Math.random()}`, 
+          ...args.data,
+          createdAt: new Date()
+        };
+        mockRounds.push(newRound);
+        return newRound;
+      }),
+      deleteMany: jest.fn(async (args: any) => {
+        if (args?.where?.id?.in) {
+          mockRounds = mockRounds.filter(r => !args.where.id.in.includes(r.id));
+        } else {
+          mockRounds = [];
+        }
+        return { count: mockRounds.length };
+      }),
+      delete: jest.fn(async (args: any) => {
+        if (args?.where?.id) {
+          mockRounds = mockRounds.filter(r => r.id !== args.where.id);
+        }
+        return { id: args?.where?.id };
+      }),
+    } as any,
     notification: {
-      deleteMany: jest.fn(),
-    },
-    $disconnect: jest.fn(),
-  },
+      deleteMany: jest.fn(() => Promise.resolve({ count: 0 })),
+    } as any,
+    $disconnect: jest.fn(() => Promise.resolve(undefined)),
+  } as any,
 }));
 
 import { prisma } from "../lib/prisma";
@@ -101,7 +140,7 @@ const FAKE_TIMER_OPTIONS: Parameters<typeof jest.useFakeTimers>[0] = {
 // ─────────────────────────────────────────────────────────────────────────────
 
 const shouldRunDbTests = process.env.RUN_DB_TESTS === "true" || process.env.CI === "true";
-const describeDb = shouldRunDbTests ? describe : describe.skip;
+const describeDb = describe;
 
 describeDb("SchedulerService", () => {
   afterAll(async () => {
@@ -185,11 +224,8 @@ describeDb("SchedulerService", () => {
   // ── autoResolveRounds() ─────────────────────────────────────────────────────
 
   describe("autoResolveRounds()", () => {
-    const createdRoundIds = new Set<string>();
-
     /**
      * Creates a Round fixture whose endTime is expressed relative to FAKE_NOW.
-     * All IDs are tracked for cleanup in afterEach.
      */
     async function createRound(options: RoundFixtureOptions = {}) {
       const {
@@ -210,13 +246,13 @@ describeDb("SchedulerService", () => {
         },
       });
 
-      createdRoundIds.add(round.id);
       return round;
     }
 
     beforeEach(() => {
       jest.useFakeTimers(FAKE_TIMER_OPTIONS);
       jest.setSystemTime(FAKE_NOW);
+      mockRounds = [];
 
       // Healthy oracle defaults — individual tests override as needed.
       (priceOracle.getPrice as any).mockReturnValue(0.35);
@@ -226,13 +262,7 @@ describeDb("SchedulerService", () => {
 
     afterEach(async () => {
       jest.useRealTimers();
-
-      if (createdRoundIds.size > 0) {
-        await prisma.round.deleteMany({
-          where: { id: { in: [...createdRoundIds] } },
-        });
-        createdRoundIds.clear();
-      }
+      mockRounds = [];
     });
 
     it("does nothing when no expired rounds exist", async () => {

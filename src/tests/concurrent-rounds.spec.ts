@@ -20,15 +20,23 @@ describe('Concurrent Round Creation Prevention (Issue #66)', () => {
     adminRoundRateLimiter.resetKey('127.0.0.1');
     adminRoundRateLimiter.resetKey('::1');
     
-    // Clear rounds to ensure a pristine state for each test
+    // Clear predictions and then rounds to ensure a pristine state for each test
+    // This avoid Foreign key constraint violations.
+    await prisma.prediction.deleteMany({});
     await prisma.round.deleteMany({});
   });
 
   beforeAll(async () => {
     app = createApp();
 
-    adminUser = await prisma.user.create({
-      data: {
+    // Clean up first in case of dirty state
+    await prisma.prediction.deleteMany({});
+    await prisma.round.deleteMany({});
+
+    adminUser = await prisma.user.upsert({
+      where: { walletAddress: 'GADMIN_CONCURRENT_TEST_AAAAAAAAAA' },
+      update: { role: UserRole.ADMIN },
+      create: {
         walletAddress: 'GADMIN_CONCURRENT_TEST_AAAAAAAAAA',
         role: UserRole.ADMIN,
         virtualBalance: 1000,
@@ -39,6 +47,7 @@ describe('Concurrent Round Creation Prevention (Issue #66)', () => {
   });
 
   afterAll(async () => {
+    await prisma.prediction.deleteMany({});
     await prisma.round.deleteMany({});
     await prisma.user.deleteMany({ where: { id: adminUser.id } });
     await prisma.$disconnect();
@@ -75,7 +84,7 @@ describe('Concurrent Round Creation Prevention (Issue #66)', () => {
       expect(res2.body.message).toContain('UP_DOWN');
 
       // Cleanup
-      await prisma.round.delete({ where: { id: firstRoundId } });
+      await prisma.round.deleteMany({ where: { id: firstRoundId } });
     });
 
     it('should prevent creating second active LEGENDS round', async () => {
@@ -108,7 +117,7 @@ describe('Concurrent Round Creation Prevention (Issue #66)', () => {
       expect(res2.body.message).toContain('LEGENDS');
 
       // Cleanup
-      await prisma.round.delete({ where: { id: firstRoundId } });
+      await prisma.round.deleteMany({ where: { id: firstRoundId } });
     });
 
     it('should allow creating UP_DOWN and LEGENDS rounds simultaneously', async () => {

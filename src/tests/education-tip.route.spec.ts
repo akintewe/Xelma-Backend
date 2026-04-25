@@ -118,7 +118,8 @@ describeEducationTip("GET /api/education/tip - Integration Tests", () => {
       expect(response.body.metadata.outcome).toBe("up");
 
       // Cleanup
-      await prisma.round.delete({ where: { id: highVolatilityRound.id } });
+      await prisma.round.deleteMany({ where: { id: 
+ highVolatilityRound.id } });
     });
 
     it("should handle price decrease correctly", async () => {
@@ -142,7 +143,8 @@ describeEducationTip("GET /api/education/tip - Integration Tests", () => {
       expect(response.body.metadata.outcome).toBe("down");
 
       // Cleanup
-      await prisma.round.delete({ where: { id: decreaseRound.id } });
+      await prisma.round.deleteMany({ where: { id: 
+ decreaseRound.id } });
     });
   });
 
@@ -220,7 +222,8 @@ describeEducationTip("GET /api/education/tip - Integration Tests", () => {
       expect(response.body.message).toContain("price data");
 
       // Cleanup
-      await prisma.round.delete({ where: { id: incompletRound.id } });
+      await prisma.round.deleteMany({ where: { id: 
+ incompletRound.id } });
     });
   });
 
@@ -325,7 +328,8 @@ describeEducationTip("GET /api/education/tip - Integration Tests", () => {
       expect(response.body.metadata.outcome).toBe("unchanged");
 
       // Cleanup
-      await prisma.round.delete({ where: { id: unchangedRound.id } });
+      await prisma.round.deleteMany({ where: { id: 
+ unchangedRound.id } });
     });
 
     it("should handle very short duration rounds", async () => {
@@ -348,7 +352,8 @@ describeEducationTip("GET /api/education/tip - Integration Tests", () => {
       expect(response.body.metadata.duration).toBe(10);
 
       // Cleanup
-      await prisma.round.delete({ where: { id: shortRound.id } });
+      await prisma.round.deleteMany({ where: { id: 
+ shortRound.id } });
     });
 
     it("should handle extreme price movements", async () => {
@@ -374,7 +379,8 @@ describeEducationTip("GET /api/education/tip - Integration Tests", () => {
       ).toBeGreaterThan(10);
 
       // Cleanup
-      await prisma.round.delete({ where: { id: extremeRound.id } });
+      await prisma.round.deleteMany({ where: { id: 
+ extremeRound.id } });
     });
   });
 });
