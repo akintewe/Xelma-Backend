@@ -58,6 +58,13 @@ export function errorHandler(
     appError = err;
   } else if (err instanceof Prisma.PrismaClientKnownRequestError) {
     appError = fromPrismaError(err);
+  } else if (
+    err instanceof SyntaxError &&
+    typeof (err as any).status === 'number' &&
+    (err as any).status === 400 &&
+    (err as any).type === 'entity.parse.failed'
+  ) {
+    appError = new ValidationError('Malformed JSON body');
   } else if (err instanceof Prisma.PrismaClientValidationError) {
     appError = new ValidationError('Invalid database query parameters');
   } else if (err instanceof Error) {

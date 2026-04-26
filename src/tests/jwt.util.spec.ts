@@ -62,8 +62,8 @@ describe("JWT utilities", () => {
     });
 
     it("should return null for expired token", () => {
-      // Create a token that expires immediately
-      process.env.JWT_EXPIRY = "0s";
+      const originalExpiry = process.env.JWT_EXPIRY;
+      process.env.JWT_EXPIRY = "1ms";
 
       const token = generateToken(testUserId, testWalletAddress, testRole as any);
 
@@ -71,6 +71,11 @@ describe("JWT utilities", () => {
       return new Promise((resolve) => {
         setTimeout(() => {
           const decoded = verifyToken(token);
+          if (originalExpiry === undefined) {
+            delete process.env.JWT_EXPIRY;
+          } else {
+            process.env.JWT_EXPIRY = originalExpiry;
+          }
           expect(decoded).toBeNull();
           resolve(null);
         }, 100);

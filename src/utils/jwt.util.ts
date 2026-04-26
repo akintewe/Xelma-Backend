@@ -3,7 +3,7 @@ import jwt from 'jsonwebtoken';
 import { JwtPayload } from '../types/auth.types';
 
 
-const JWT_EXPIRY: string | number = process.env.JWT_EXPIRY || '7d'; // 7 days default
+const getJwtExpiry = (): string | number => process.env.JWT_EXPIRY || '7d';
 
 /**
  * Helper to get JWT secret at runtime.
@@ -33,7 +33,7 @@ export function generateToken(userId: string, walletAddress: string, role: UserR
 
   // Pass options directly to avoid TypeScript type inference issues
   return jwt.sign(payload, getJwtSecret(), {
-    expiresIn: JWT_EXPIRY as any,
+    expiresIn: getJwtExpiry() as any,
   });
 }
 

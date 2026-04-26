@@ -1,4 +1,5 @@
 import { NextFunction, Request, Response, Router } from "express";
+import { z } from "zod";
 import {
   authenticateUser,
   AuthRequest,
@@ -7,12 +8,31 @@ import {
 } from "../middleware/auth.middleware";
 import { validate } from "../middleware/validate.middleware";
 import { batchLeaderboardQuerySchema } from "../schemas/predictions.schema";
+import { AppError } from "../utils/errors";
+import { asyncHandler } from "../middleware/errorHandler.middleware";
 import {
   getBatchUserPositions,
   getLeaderboard,
 } from "../services/leaderboard.service";
 
 const router = Router();
+
+const leaderboardQuerySchema = z.object({
+  limit: z
+    .preprocess((value) => {
+      if (typeof value === "string") return Number(value);
+      return value;
+    }, z.number().int().min(1).max(500))
+    .optional()
+    .default(100),
+  offset: z
+    .preprocess((value) => {
+      if (typeof value === "string") return Number(value);
+      return value;
+    }, z.number().int().min(0))
+    .optional()
+    .default(0),
+});
 
 /**
  * @swagger
@@ -55,19 +75,25 @@ const router = Router();
 router.get(
   "/",
   optionalAuthentication,
-  async (req: AuthRequest, res: Response, next: NextFunction) => {
+  validate(leaderboardQuerySchema, "query"),
+  asyncHandler(async (req: AuthRequest, res: Response) => {
+    const { limit, offset } = req.query as unknown as {
+      limit: number;
+      offset: number;
+    };
+
+    const userId = req.user?.userId;
+
     try {
-      const limit = Math.min(parseInt(req.query.limit as string) || 100, 500);
-      const offset = parseInt(req.query.offset as string) || 0;
-      const userId = req.user?.userId;
-
       const leaderboard = await getLeaderboard(limit, offset, userId);
-
       res.json(leaderboard);
     } catch (error) {
-      next(error);
+      if (error instanceof AppError) {
+        throw error;
+      }
+      throw new AppError("Failed to fetch leaderboard", 500, "LEADERBOARD_FETCH_FAILED");
     }
-  },
+  }),
 );
 
 /**
